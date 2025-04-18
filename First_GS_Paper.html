@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GK Test for Visually Impaired</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        #start-btn {
+            display: block;
+            margin: 20% auto;
+            padding: 20px 40px;
+            font-size: 24px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #quiz-container {
+            display: none;
+        }
+        .question {
+            text-align: left;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .options {
+            list-style: none;
+            padding: 0;
+        }
+        .options li {
+            margin: 12px 0;
+        }
+        .speak-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #timer {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 24px;
+            color: #d9534f;
+        }
+        #submit-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        #feedback-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .correct {
+            color: green;
+        }
+        .incorrect {
+            color: red;
+        }
+        #speak-results-btn {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+        }
+        #score-text {
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <button id="start-btn" onclick="startTest()">Start Test</button>
+
+    <div id="quiz-container">
+        <h1>General Knowledge Test</h1>
+        <div id="timer">05:00</div>
+        <div id="quiz"></div>
+        <button id="submit-btn" onclick="submitQuiz()">Submit</button>
+    </div>
+
+    <div id="feedback-container">
+        <h2>Quiz Results</h2>
+        <div id="score-text"></div>
+        <button id="speak-results-btn">🔊 Speak Results</button>
+        <div id="feedback"></div>
+    </div>
+
+    <script>
+        const questions = [
+            { q: "What is the capital of France?", options: ["Berlin", "Madrid", "Paris", "Rome"], answer: "Paris" },
+            { q: "Which planet is known as the Red Planet?", options: ["Earth", "Mars", "Jupiter", "Saturn"], answer: "Mars" },
+            { q: "Who wrote 'Hamlet'?", options: ["Shakespeare", "Hemingway", "Tolkien", "Austen"], answer: "Shakespeare" },
+            { q: "What is the largest ocean on Earth?", options: ["Atlantic", "Indian", "Arctic", "Pacific"], answer: "Pacific" },
+            { q: "Which is the longest river in the world?", options: ["Amazon", "Nile", "Yangtze", "Mississippi"], answer: "Nile" },
+            { q: "What is the chemical symbol for Gold?", options: ["Au", "Ag", "Fe", "Pb"], answer: "Au" },
+            { q: "Who discovered gravity?", options: ["Newton", "Einstein", "Galileo", "Darwin"], answer: "Newton" },
+            { q: "What is the hardest natural substance?", options: ["Gold", "Iron", "Diamond", "Silver"], answer: "Diamond" },
+            { q: "What is the national bird of the USA?", options: ["Peacock", "Eagle", "Sparrow", "Owl"], answer: "Eagle" },
+            { q: "Who painted the Mona Lisa?", options: ["Van Gogh", "Picasso", "Da Vinci", "Michelangelo"], answer: "Da Vinci" }
+        ];
+
+        let timer;
+        let timeLeft = 300;
+        let score = 0;
+        let speechSynthesisInstance = window.speechSynthesis;
+        let currentSpeech = null;
+        let isSpeakingResults = false;
+
+        function startTest() {
+            document.getElementById('start-btn').style.display = 'none';
+            document.getElementById('quiz-container').style.display = 'block';
+            createQuiz();
+            startTimer();
+        }
+
+        function createQuiz() {
+            const quizDiv = document.getElementById('quiz');
+            questions.forEach((item, index) => {
+                let questionBlock = document.createElement('div');
+                questionBlock.className = 'question';
+
+                let questionText = document.createElement('p');
+                questionText.textContent = `${index + 1}. ${item.q}`;
+                questionBlock.appendChild(questionText);
+
+                let speakButton = document.createElement('button');
+                speakButton.textContent = "🔊 Speak";
+                speakButton.className = 'speak-btn';
+                speakButton.onclick = () => speakOptions(item.q, item.options);
+                questionBlock.appendChild(speakButton);
+
+                let optionsList = document.createElement('ul');
+                optionsList.className = 'options';
+                item.options.forEach((option, i) => {
+                    let li = document.createElement('li');
+                    let radio = document.createElement('input');
+                    radio.type = 'radio';
+                    radio.name = `q${index}`;
+                    radio.value = option;
+                    radio.onclick = () => stopSpeech(); // Stop speech when an option is clicked
+                    li.appendChild(radio);
+                    li.appendChild(document.createTextNode(option));
+                    optionsList.appendChild(li);
+                });
+                questionBlock.appendChild(optionsList);
+                quizDiv.appendChild(questionBlock);
+            });
+        }
+
+        function speakOptions(question, options) {
+            if (speechSynthesisInstance.speaking) {
+                speechSynthesisInstance.cancel();
+            }
+            const optionPrefixes = ["First option is", "Second option is", "Third option is", "Fourth option is"];
+            const text = `${question}. ` + options.map((opt, i) => `${optionPrefixes[i]} ${opt}`).join(". ");
+            let speech = new SpeechSynthesisUtterance(text);
+            speech.lang = "en-IN";
+            speech.rate = 0.9; // Slower speech rate
+            let voices = speechSynthesisInstance.getVoices();
+            speech.voice = voices.find(voice => voice.lang === "en-IN") || voices[0];
+            speechSynthesisInstance.speak(speech);
+        }
+
+        function stopSpeech() {
+            if (speechSynthesisInstance.speaking) {
+                speechSynthesisInstance.cancel();
+                isSpeakingResults = false;
+            }
+        }
+
+        function startTimer() {
+            timer = setInterval(() => {
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    submitQuiz();
+                } else {
+                    timeLeft--;
+                    document.getElementById('timer').textContent = formatTime(timeLeft);
+                }
+            }, 1000);
+        }
+
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function submitQuiz() {
+            if (speechSynthesisInstance.speaking) {
+                speechSynthesisInstance.cancel();
+            }
+            clearInterval(timer);
+
+            score = 0;
+            let feedbackHTML = '';
+
+            questions.forEach((item, index) => {
+                const selectedOption = document.querySelector(`input[name="q${index}"]:checked`);
+                let isCorrect = false;
+
+                if (selectedOption && selectedOption.value === item.answer) {
+                    score++;
+                    isCorrect = true;
+                }
+
+                feedbackHTML += `<p>`;
+                feedbackHTML += `<strong>${index + 1}. ${item.q}</strong><br>`;
+
+                if (selectedOption) {
+                    feedbackHTML += `Your answer: ${selectedOption.value} <span class="${isCorrect ? 'correct' : 'incorrect'}">${isCorrect ? 'Correct' : 'Incorrect'}</span><br>`;
+                } else {
+                    feedbackHTML += `You did not answer this question.<br>`;
+                }
+
+                feedbackHTML += `Correct answer: ${item.answer}<br>`;
+                feedbackHTML += `</p>`;
+            });
+
+            const resultText = `You got ${score} out of ${questions.length} questions correct!`;
+            alert(resultText); // Show alert with the result
+            document.getElementById('score-text').textContent = resultText; // Display result below Quiz Results
+            document.getElementById('feedback').innerHTML = feedbackHTML;
+            document.getElementById('quiz-container').style.display = 'none';
+            document.getElementById('feedback-container').style.display = 'block';
+        }
+
+        function speakResults() {
+            stopSpeech(); // Ensure any existing speech is stopped before starting a new one
+
+            const feedbackText = document.getElementById('feedback').textContent;
+            const resultText = `You got ${score} out of ${questions.length} questions correct!`;
+            const fullText = resultText + " " + feedbackText;
+
+            // Split the text into lines and add a pause (ellipsis) between them
+            const lines = fullText.split("\n");
+            let currentLine = 0;
+            isSpeakingResults = true;
+
+            function speakNextLine() {
+                if (currentLine < lines.length && isSpeakingResults) {
+                    const line = lines[currentLine].trim();
+                    if (line) {
+                        currentSpeech = new SpeechSynthesisUtterance(line + "...."); // Add pause
+                        currentSpeech.lang = "en-IN";
+                        currentSpeech.rate = 0.8;
+                        let voices = speechSynthesisInstance.getVoices();
+                        currentSpeech.voice = voices.find(voice => voice.lang === "en-IN") || voices[0];
+
+                        speechSynthesisInstance.speak(currentSpeech);
+                        currentSpeech.onend = () => {
+                            currentLine++;
+                            speakNextLine();
+                        };
+                    } else {
+                        currentLine++;
+                        speakNextLine();
+                    }
+                } else {
+                    isSpeakingResults = false;
+                }
+            }
+
+            speakNextLine();
+        }
+
+        // Stop speech when the speak button is clicked again
+        document.getElementById('speak-results-btn').addEventListener('click', function () {
+            if (speechSynthesisInstance.speaking) {
+                stopSpeech();
+            } else {
+                speakResults();
+            }
+        });
+
+        // Double-tap to stop speech
+	
+	document.addEventListener('dblclick', toggleSpeech);
+
+function toggleSpeech() {
+    if (speechSynthesis.speaking) {
+        if (speechSynthesis.paused) {
+            speechSynthesis.resume(); // Resumes if it was paused
+        } else {
+            speechSynthesis.pause(); // Pauses if it was speaking
+        }
+    }
+}
+
+
+        window.onbeforeunload = function() {
+            return "Changes you made may not be saved.";
+        };
+    </script>
+</body>
+</html>
